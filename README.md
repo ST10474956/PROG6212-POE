@@ -1,109 +1,96 @@
-# Cybersecurity Awareness Chatbot — Part 2
+# RaceDay — Part 2: RESTful API (PROG6212)
 
-A Windows Forms desktop application called **CyberSafe**. It gives student-friendly cybersecurity guidance through a graphical interface and remembers a small amount of information during the current session.
+This is the Part 2 API project built from the Part 1 RaceDay ERD, SQL design and endpoint plan. The API uses ASP.NET Core Web API, EF Core Code First, SQL Server, JWT bearer authentication, role checks, Swagger and a GitHub Actions build/test workflow.
 
-## Relationship to the earlier Part 1 feedback
+## Folder map
+- `RaceDay.Api/Models` — entity classes (Users, Roles, Events, Categories, Enrolments, Results)
+- `RaceDay.Api/Data` — EF Core database context and relationships
+- `RaceDay.Api/DTOs` — request validation models
+- `RaceDay.Api/Services` — password hashing and token creation
+- `RaceDay.Api/Controllers` — endpoint logic and access rules
+- `RaceDay.Tests` — automated smoke test project
+- `.github/workflows/raceday-ci.yml` — build and test on pushes/PRs
+- `docs/` — Part 1 documents supplied with this project
 
-The Part 1 marking feedback shared earlier refers to the separate RaceDay event-management project (ERD, API endpoint plan and SQL Server database). Those database-specific requirements do not belong to this Cybersecurity Awareness Chatbot brief, so they have not been mixed into this project. Relevant general lessons have been applied: keep the repository organised, include clear documentation and all required assets, store the GitHub Actions workflow under `.github/workflows/`, and maintain meaningful commits and version tags.
+## Roles in plain language
+- **Organiser:** creates and manages their own events and event categories, views event enrolments, and records/corrects results for participants in their events.
+- **Participant:** browses events/categories, enrols in a category, cancels their own enrolment, and views their own profile and results.
+- Public browsing endpoints do not require a login. Private endpoints require a valid bearer token. Role attributes stop a Participant from using Organiser actions and vice versa. Ownership is checked as well as role.
 
-## Features
-
-- Dark, spaced Windows Forms interface with topic buttons and a chat area.
-- Voice greeting loaded from `Assets/voice.wav` and a shield/ASCII-art identity asset.
-- Keyword recognition for passwords, scams, privacy, phishing, malware and public Wi-Fi.
-- Randomised tips stored in `Dictionary<string, List<string>>` collections.
-- Follow-up conversation support, including “give me another tip”, “explain more” and “tell me more”.
-- Session memory for a user's name and favourite cybersecurity topic.
-- Simple sentiment detection for worried, frustrated and curious messages.
-- Empty-input and unknown-input handling.
-- Object-oriented structure, a generic `List<ChatMessage>`, dictionaries and a response delegate/event.
+## Part 1 alignment / implementation notes
+The EF entities follow the Part 1 SQL tables and foreign-key relationships: `Roles`, `Users`, `Events`, `Categories`, `Enrolments`, and `Results`. `Weather` and `Routes` were shown in the ERD but are not in the supplied Part 1 SQL table script or endpoint list; they are not implemented in this minimum API.
+- Part 1's register plan uses `firstName`/`lastName`; the submitted SQL schema stores `FullName`. This API accepts `FullName` to keep the database aligned with the SQL script.
+- Part 1's category endpoint includes `entryFee`, but the Part 1 Categories table has no `EntryFee` column. This implementation omits it rather than silently changing the schema.
+- Part 1's result plan names `positionOverall` and `positionCategory`; its SQL table has one `Position` column. The implementation maps the supplied schema's `Position`.
+- Part 1 describes JWT role claims. The API follows that approved endpoint design (bearer JWT), rather than ASP.NET session cookies. If your lecturer explicitly insists on server-side session storage, confirm this design difference and adapt it before final submission.
 
 ## Requirements
+- .NET 8 SDK
+- Visual Studio 2022 (ASP.NET and web development workload) or VS Code
+- SQL Server / SQL Server Express / LocalDB
+- Git and GitHub account
 
-- Windows 10 or Windows 11.
-- .NET 8 SDK (Windows desktop workload / Windows Forms support).
-- Visual Studio 2022 or newer with the **.NET desktop development** workload, or the .NET CLI on Windows.
+## Run locally (Windows / Visual Studio)
+1. Extract this folder and open `RaceDay.sln`.
+2. In `RaceDay.Api/appsettings.json`, change the connection string to your SQL Server instance. The default uses LocalDB.
+3. Open **Tools → NuGet Package Manager → Package Manager Console**, set Default project to `RaceDay.Api`, then run:
+   ```powershell
+   Add-Migration InitialCreate
+   Update-Database
+   ```
+   Alternatively:
+   ```bash
+   dotnet tool install --global dotnet-ef
+   dotnet ef migrations add InitialCreate --project RaceDay.Api
+   dotnet ef database update --project RaceDay.Api
+   ```
+4. Run the API (`RaceDay.Api`) with Visual Studio or:
+   ```bash
+   dotnet restore RaceDay.sln
+   dotnet build RaceDay.sln
+   dotnet run --project RaceDay.Api
+   ```
+5. Open the Swagger URL shown in the terminal (normally `https://localhost:xxxx/swagger`).
 
-## Run in Visual Studio
+**Do not commit production secrets.** Replace the development JWT key with a long random secret in local user-secrets/environment variables before deployment.
 
-1. Extract the project folder.
-2. Open `CybersecurityAwarenessChatbot.csproj` in Visual Studio.
-3. Allow the project to restore/build if prompted.
-4. Set the project as the startup project.
-5. Press **F5** or click **Start**.
-6. Use the topic buttons or type a question into the message box.
+## Swagger and login walkthrough
+1. `POST /api/auth/register` — register an Organiser and a Participant. Role must be exactly `Organiser` or `Participant`.
+2. `POST /api/auth/login` — copy the returned `token`.
+3. Click **Authorize** in Swagger and enter `Bearer YOUR_TOKEN` (include `Bearer` and a space).
+4. Test endpoints using the correct role token. Expected responses include 200, 201, 204, 400, 401, 403, 404 and 409 as applicable.
 
-## Run using the .NET CLI
-
-Open a terminal in this folder on a Windows machine and run:
-
-```powershell
-dotnet restore
-dotnet build
-dotnet run
-```
-
-This is a Windows Forms application and will not run as a desktop GUI on Linux or macOS.
-
-## Try these example messages
-
-| Purpose | Example | Expected behaviour |
+## Endpoint checklist (matches Part 1 plan)
+| Method | Route | Access |
 |---|---|---|
-| Password keyword | `Tell me about password safety` | Shows a password safety tip. |
-| Scam keyword + sentiment | `I'm worried about online scams` | Responds supportively and provides a scam tip. |
-| Privacy memory | `I'm interested in privacy` | Saves the preferred topic for the session and gives a tip. |
-| Name memory | `My name is Sam` | Greets Sam and remembers the name for the session. |
-| Recall | `What is my name?` | Recalls the name if it was entered earlier in the session. |
-| Random responses | `Give me another phishing tip` | Selects a phishing tip from a list. |
-| Follow-up | `Explain more` | Continues with the current topic. |
-| Unknown input | `zebra moon rocket` | Gives a safe default response without closing. |
-| Empty input | Send an empty message | Prompts the user to type a message. |
+| POST | `/api/auth/register` | Public |
+| POST | `/api/auth/login` | Public |
+| GET / PUT / DELETE | `/api/users/me` | Authenticated |
+| GET | `/api/events`, `/api/events/{id}` | Public |
+| POST | `/api/events` | Organiser |
+| PUT / DELETE | `/api/events/{id}` | Event owner Organiser |
+| GET | `/api/events/{eventId}/categories` | Public |
+| POST | `/api/events/{eventId}/categories` | Event owner Organiser |
+| PUT / DELETE | `/api/categories/{id}` | Event owner Organiser |
+| POST | `/api/categories/{categoryId}/enrol` | Participant |
+| GET | `/api/enrolments/me` | Participant |
+| GET | `/api/events/{eventId}/enrolments` | Event owner Organiser |
+| DELETE | `/api/enrolments/{id}` | Enrolment owner Participant |
+| POST | `/api/enrolments/{enrolmentId}/results` | Event owner Organiser |
+| GET | `/api/results/me` | Participant |
+| GET | `/api/events/{eventId}/results` | Public |
+| PUT | `/api/results/{id}` | Event owner Organiser |
 
-## Project structure
-
-```text
-CybersecurityAwarenessChatbot/
-├── Assets/
-│   ├── ascii-art.txt
-│   ├── cyber-shield.png
-│   └── voice.wav
-├── Docs/
-│   ├── Part2-Report.md
-│   ├── Test-Plan.md
-│   └── Video-Presentation-Script.md
-├── Models/
-│   └── ChatMessage.cs
-├── Services/
-│   └── ChatbotEngine.cs
-├── .github/workflows/
-│   └── build.yml
-├── MainForm.cs
-├── Program.cs
-├── CybersecurityAwarenessChatbot.csproj
-└── README.md
+## Run tests
+```bash
+dotnet test RaceDay.sln
 ```
+The included smoke test checks that the Development Swagger document responds. Add endpoint tests for register/login, invalid credentials, authenticated profile, Organiser event CRUD, Participant forbidden responses, enrolment duplicate/full capacity and result ownership. A smoke test alone does not meet the full 15-mark testing rubric.
 
-## Memory and privacy
+## GitHub Actions / commits
+The workflow at `.github/workflows/raceday-ci.yml` restores, builds and runs tests on every push and pull request. Push this project to a clearly named Part 2 branch (example `part-2-api`), then check **GitHub → Actions**. Fix failures until the latest workflow run is green.
+- Insert your own screenshot of a successful green Actions run below. Do not use a fabricated screenshot.
+- Make at least 20 meaningful commits, each showing a genuine step (model, context, auth, each controller, validation, tests, docs, CI, fixes). Do not create empty or misleading commits.
 
-The chatbot's memory is in-memory only. It is not saved to a database or uploaded to a server. Closing the app clears the session memory. Do not enter real passwords, banking information or other sensitive personal information.
-
-## Troubleshooting
-
-- If Visual Studio says the target framework is unavailable, install the .NET 8 SDK and the .NET desktop development workload.
-- If the greeting does not play, check that `Assets/voice.wav` exists and that system volume is enabled.
-- If the logo is missing, check that `Assets/cyber-shield.png` exists. The text and chat functions do not depend on the logo.
-- If the application closes unexpectedly, run it from Visual Studio and check the Error List / Output window.
-
-## GitHub and submission checklist
-
-- [ ] Push the complete project folder to your own GitHub repository.
-- [ ] Confirm the source, README and three assets are visible in GitHub.
-- [ ] Confirm the build workflow runs successfully on GitHub Actions.
-- [ ] Keep at least six meaningful commits; suggested messages are in `Docs/Part2-Report.md`.
-- [ ] Create at least two releases/tags (the rubric recommends three clear version tags). Use the release notes in `Docs/Release-Notes.md` as a guide.
-- [ ] Record your own screen and voice-over demonstrating the code and features. Upload as **Unlisted** to YouTube.
-- [ ] Replace the video placeholder below with your actual unlisted YouTube URL.
-- [ ] Submit only your GitHub repository URL on ARC, and submit the YouTube unlisted link as instructed by your lecturer.
-
-
+**CI screenshot:** `docs/ci-green-build.png`
 
