@@ -1,0 +1,22 @@
+version: '3.8'
+services:
+  raceday-api:
+    build:
+      context: ./RaceDay.Api
+      dockerfile: Dockerfile
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__RaceDay: ${RACEDAY_SQL_CONNECTION}
+      ConnectionStrings__AzureBlobStorage: ${AZURE_BLOB_CONNECTION}
+      Jwt__Key: ${JWT_KEY}
+    ports: ["5080:8080"]
+
+  raceday-mvc:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      Api__BaseUrl: http://raceday-api:8080/
+    ports: ["8080:8080"]
+    depends_on: [raceday-api]

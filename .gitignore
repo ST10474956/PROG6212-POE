@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+.env
+**/appsettings.Development.json
+TestResults/
+docs/ci-green-build.png
