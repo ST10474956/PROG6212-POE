@@ -1,0 +1,25 @@
+name: RaceDay Part 3 CI
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Validate required files
+        run: |
+          test -f RaceDay.Api/RaceDay.Api.csproj
+          test -f RaceDay.Mvc/RaceDay.Mvc.csproj
+          test -f Dockerfile
+          test -f README.md
+      - name: Restore
+        run: dotnet restore RaceDay.sln
+      - name: Build all projects
+        run: dotnet build RaceDay.sln --configuration Release --no-restore
+      - name: Test
+        run: dotnet test RaceDay.sln --configuration Release --no-build --logger "trx"
